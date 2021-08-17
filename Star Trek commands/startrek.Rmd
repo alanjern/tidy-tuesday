@@ -1,0 +1,262 @@
+---
+title: "Star Trek commands"
+author: "Alan Jern"
+date: "8/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(tidyverse)
+library(showtext)
+library(forcats)
+library(ggthemes)
+library(magick)
+library(patchwork)
+#library(ggrepel)
+library(ggtext)
+```
+
+```{r data}
+computer <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-17/computer.csv')
+```
+
+```{r set-plot-features}
+
+tng_color_palette <- c("#c1c730",
+                       "#a71313",
+                       "#2b53a7",
+                       "#000000",
+                       "#d6a444",
+                       "#B85900",
+                       "#288298",
+                       "#787878")
+
+font_add_google("Bebas Neue", "bebas")
+font_add_google("Fjalla One", "fjalla")
+font_add_google("Orbitron", "orbitron")
+font_add_google("Barlow Condensed", "barlow")
+
+showtext_auto()
+showtext_opts(dpi = 96)
+
+```
+
+
+```{r plot-interaction-frequency}
+
+most_common_chars <- computer %>% 
+  filter(char_type != "Computer") %>%
+  group_by(char) %>%
+  count() %>%
+  arrange(desc(n)) %>%
+  ungroup() %>%
+  slice_head(n = 9) %>%
+  filter(char != "Barclay")
+
+interaction_frequency_data <- computer %>% right_join(most_common_chars, by = "char")
+
+interaction_length_data <- computer %>% 
+  right_join(most_common_chars, by = "char") %>%
+  mutate(interaction_length = str_count(interaction, "( )+")+1,
+         char = as.factor(char)) %>%
+  distinct(interaction, .keep_all = TRUE)
+
+riker_quote <- "\"Very good. Very good indeed. Now computer -- someone to play with. A combo.\nSay drums upright bass... piano. And a 'bone for me. Now -- an audience...\nWhoa... too many. I was thinking of something a little more personal... intimate.\nGreat job  boys. But computer... blondes and jazz seldom go together.\""
+riker_quote_df <- tribble(
+  ~x, ~y, ~label,
+  6.8, 315, riker_quote
+)
+
+arrows1 <- tibble(
+  x1 = c(4.3),
+  y1 = c(count(interaction_frequency_data %>% filter(char == "Riker"))$n + 52),
+  x2 = c(4),
+  y2 = c(count(interaction_frequency_data %>% filter(char == "Riker"))$n + 7)
+)
+
+arrows2 <- tibble(
+  x1 = c(5.7),
+  y1 = c(count(interaction_frequency_data %>% filter(char == "Riker"))$n + 52),
+  x2 = c(6),
+  y2 = c(count(interaction_frequency_data %>% filter(char == "Troi"))$n + 7)
+)
+
+png <- magick::image_read("https://stt.wiki/w/images/b/b3/Commander_Riker_Head.png")
+img <- grid::rasterGrob(png, width = 0.2, interpolate = TRUE) 
+
+p_interactions <- ggplot(data = interaction_frequency_data,
+       mapping = aes(x = fct_reorder(char, n, .desc = TRUE))) +
+  geom_bar(mapping = aes(fill = pri_type)) +
+  geom_curve(data = arrows1, 
+             mapping= aes(x = x1, y = y1,
+                          xend = x2, yend = y2),
+             size = 0.4,
+             curvature = 0.3,
+             arrow = arrow(length = unit(0.05, "inches"),
+                           type = "closed"),
+             color = "gray40") +
+  geom_curve(data = arrows2, 
+             mapping= aes(x = x1, y = y1,
+                          xend = x2, yend = y2),
+             size = 0.4,
+             curvature = -0.2,
+             arrow = arrow(length = unit(0.05, "inches"),
+                           type = "closed"),
+             color = "gray40") +
+  annotate("text", x = 5, y = count(interaction_frequency_data %>% filter(char == "Riker"))$n + 62,
+           color = "gray40",
+           size = 2.7,
+           label = "Riker and Troi rarely ask questions",
+           family = "barlow") +
+  annotation_custom(img, xmin = 3.5, xmax = Inf,
+                    ymin = 295, ymax = Inf) +
+  geom_textbox(data = riker_quote_df,
+               mapping = aes(x = x, y = y, label = label),
+               family = "barlow",
+               hjust = c(0),
+               size = 2,
+               color = "gray20",
+               box.color = "black") +
+  coord_cartesian(clip = "off") +
+  scale_fill_manual(values = tng_color_palette) +
+  labs(
+    title = "Who interacts with the computer the most?",
+    subtitle = "Geordi interacts more *and* asks more questions",
+    x = "Character",
+    y = "Interactions",
+    fill = "Interaction type"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(25,25,10,25),
+    plot.title = element_markdown(family = "bebas"),
+    plot.subtitle = element_markdown(family = "barlow"),
+    axis.text = element_text(family = "barlow"),
+    legend.title = element_text(family = "bebas"),
+    axis.title = element_text(family = "barlow"),
+    panel.grid.major.x = element_blank()
+  )
+
+
+```
+```{r plot-command-type-frequencies}
+
+command_type_freq_data_all <- computer %>%
+  filter(char_type != "Computer") %>%
+  mutate(domain = replace(domain, domain == "Iot", "IoT")) %>%
+  mutate(domain = replace(domain, domain == "Communications" |
+                            domain == "Emergency" |
+                            domain == "Help" |
+                            domain == "Override", "Other")) %>%
+  mutate(domain = replace(domain, domain == "InfoSeek", "Information")) %>%
+  mutate(domain = replace(domain, domain == "Entertainment", "Entertainment Control")) %>%
+  mutate(domain = replace(domain, domain == "IoT", "Hardware Control")) %>%
+  replace_na(list(domain = "Other"))
+
+command_type_freq_data_all$domain2 <- fct_infreq(command_type_freq_data_all$domain)
+command_type_freq_data_all$domain2 <- fct_relevel(command_type_freq_data_all$domain2, 
+                                                  "Other", after = Inf)
+
+command_type_summary_data <-command_type_freq_data_all %>% 
+  group_by(domain2) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  ungroup() %>% 
+  mutate(cumsum = cumsum(n)) %>% 
+  mutate(prop = 1-cumsum/sum(n)) %>% 
+  mutate(y_label = case_when(
+    is.na(lag(prop)) ~ prop + (1-prop) / 2,
+    TRUE ~ prop + (lag(prop) - prop) / 2
+  ))
+
+p_command_types <- ggplot(data = command_type_freq_data_all,
+       mapping = aes(x = 1)) +
+  geom_bar(mapping = aes(fill = domain2),
+           position = "fill",
+           color = "white",
+           show.legend = FALSE) +
+  scale_y_continuous(breaks = c(0,0.5,1),
+                     labels = c("0%","50%","100%")) +
+  scale_x_continuous(breaks = NULL) +
+  labs(
+    title = "What interactions are most common?",
+    subtitle = "Controlling the holodeck and requesting information are most common",
+    x = element_blank(),
+    y = element_blank()
+  ) +
+  annotate("text", 
+           x = rep(1,length(command_type_summary_data$y_label)),
+           y = command_type_summary_data$y_label,
+           label = command_type_summary_data$domain2,
+           family = "barlow",
+           color = "white",
+           size = 5) +
+  theme_minimal() +
+  scale_fill_manual(values = tng_color_palette) +
+  theme(
+    plot.title = element_text(family = "bebas"),
+    plot.subtitle = element_text(family = "barlow"),
+    axis.text = element_text(family = "barlow"),
+    axis.title = element_text(family = "barlow"),
+  )
+
+```
+
+```{r plot-interaction-length}
+
+interaction_length_data$char2 <- fct_reorder(interaction_length_data$char,
+                                             interaction_length_data$interaction_length, .desc = TRUE)
+
+interaction_length_medians <- interaction_length_data %>% 
+  group_by(char) %>% 
+  summarize(median_length = median(interaction_length))
+
+interaction_length_medians$char2 <- fct_reorder(interaction_length_medians$char,
+                                                interaction_length_medians$median_length, .desc = TRUE)
+
+p_interaction_length <- ggplot() +
+  geom_vline(data = interaction_length_medians,
+             mapping = aes(xintercept = median_length),
+             color = "gray60",
+             size = 1.1) +
+  geom_histogram(data = interaction_length_data,
+                 mapping = aes(x = interaction_length, fill = char),
+                 show.legend = FALSE) +
+  facet_wrap(vars(char2)) +
+  labs(
+    title = "How long are characters' interactions with the computer?",
+    subtitle = "<span style = 'color:#2b53a7;'>Geordi</span> is pretty chatty. Picard, not so much.",
+    x = "Number of words in interaction",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = tng_color_palette) +
+  theme(
+    plot.margin = margin(25,25,10,25),
+    plot.title = element_text(family = "bebas"),
+    plot.subtitle = element_markdown(family = "barlow"),
+    axis.text = element_text(family = "barlow"),
+    axis.title = element_text(family = "barlow"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    strip.text = element_text(family = "barlow")
+  )
+
+```
+
+```{r put-plots-together}
+
+combined_plot <- ((p_interactions / p_interaction_length) | p_command_types) +
+  plot_annotation(
+    title = "How the characters of Star Trek: The Next Generation interact with The Enterprise's computer",
+    caption = "@alanjern | Data: SpeechInteraction.org"
+) &
+  theme(title = element_text(family = "barlow", size = 16))
+
+ggsave("startrekcommands.png", combined_plot, width = 17, height = 10, units = "in")
+
+```
+
