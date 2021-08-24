@@ -1,0 +1,86 @@
+---
+title: "Lemurs Tidy Tuesday"
+author: "Alan Jern"
+date: "8/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(forcats)
+library(ggridges)
+library(ggsci)
+library(showtext)
+```
+
+```{r load-data}
+lemurs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-24/lemur_data.csv')
+```
+
+## Clean data
+```{r explore-data}
+most_common_lemurs <- lemurs %>% 
+  mutate(taxon = replace(taxon, taxon == "MMUR", "Gray mouse lemur")) %>%
+  mutate(taxon = replace(taxon, taxon == "CMED", "Fat-tailed dwarf lemur")) %>%
+  mutate(taxon = replace(taxon, taxon == "DMAD", "Aye-aye")) %>%
+  mutate(taxon = replace(taxon, taxon == "EFLA", "Blue-eyed black lemur")) %>%
+  mutate(taxon = replace(taxon, taxon == "EMON", "Mongoose lemur")) %>%
+  mutate(taxon = replace(taxon, taxon == "ECOL", "Collared brown lemur")) %>%
+  mutate(taxon = replace(taxon, taxon == "VVV", "Black-and-white ruffed lemur")) %>%
+  mutate(taxon = replace(taxon, taxon == "NPYG", "Pygmy slow loris")) %>%
+  mutate(taxon = replace(taxon, taxon == "VRUB", "Red ruffed lemur")) %>%
+  mutate(taxon = replace(taxon, taxon == "PCOQ", "Coquerel’s sifaka")) %>%
+  mutate(taxon = replace(taxon, taxon == "LCAT", "Ring-tailed lemur")) %>%
+  mutate(taxon = fct_lump_n(taxon,10)) %>%
+  filter(taxon != "Other" & !is.na(weight_g)) %>%
+  select(taxon, sex, name, dob, estimated_dob, litter_size, age_at_death_y, n_known_offspring, weight_g)
+```
+
+## Plot
+```{r plot-weights}
+
+font_add_google("Poppins", "poppins")
+font_add_google("Raleway", "raleway")
+
+showtext_auto()
+showtext_opts(dpi = 96)
+
+ggplot(data = most_common_lemurs, 
+       mapping = aes(x = weight_g, 
+                     y = fct_reorder(taxon, weight_g),
+                     fill = fct_reorder(taxon, weight_g))) +
+  geom_density_ridges(color = "gray40",
+                      alpha = 0.6,
+                      quantile_lines = TRUE,
+                      quantiles = 2,
+                      rel_min_height = 0.001,
+                      show.legend = FALSE) +
+  xlim(c(-200, 6200)) +
+  scale_fill_aaas() +
+  theme_minimal() +
+  labs(
+    title = "Weights of lemurs at the Duke Lemur Center",
+    subtitle = "Most common lemurs, 1966 - present",
+    caption = "@alanjern | Data: Duke Lemur Center",
+    x = "Weight (g)",
+    y = element_blank()
+  ) +
+  theme(
+    plot.background = element_rect("white"),
+    plot.title = element_text(family = "raleway"),
+    plot.subtitle = element_text(family = "poppins",
+                                 color = "gray30"),
+    axis.text = element_text(family = "poppins"),
+    axis.title = element_text(family = "poppins"),
+    plot.caption = element_text(family = "poppins", size = 6,
+                                color = "gray50"),
+  )
+
+ggsave("lemurs.png", width = 6, height = 4, units = "in")
+```
+
+
