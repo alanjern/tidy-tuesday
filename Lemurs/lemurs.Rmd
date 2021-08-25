@@ -24,17 +24,19 @@ lemurs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tid
 ## Clean data
 ```{r explore-data}
 most_common_lemurs <- lemurs %>% 
-  mutate(taxon = replace(taxon, taxon == "MMUR", "Gray mouse lemur")) %>%
-  mutate(taxon = replace(taxon, taxon == "CMED", "Fat-tailed dwarf lemur")) %>%
-  mutate(taxon = replace(taxon, taxon == "DMAD", "Aye-aye")) %>%
-  mutate(taxon = replace(taxon, taxon == "EFLA", "Blue-eyed black lemur")) %>%
-  mutate(taxon = replace(taxon, taxon == "EMON", "Mongoose lemur")) %>%
-  mutate(taxon = replace(taxon, taxon == "ECOL", "Collared brown lemur")) %>%
-  mutate(taxon = replace(taxon, taxon == "VVV", "Black-and-white ruffed lemur")) %>%
-  mutate(taxon = replace(taxon, taxon == "NPYG", "Pygmy slow loris")) %>%
-  mutate(taxon = replace(taxon, taxon == "VRUB", "Red ruffed lemur")) %>%
-  mutate(taxon = replace(taxon, taxon == "PCOQ", "Coquerel’s sifaka")) %>%
-  mutate(taxon = replace(taxon, taxon == "LCAT", "Ring-tailed lemur")) %>%
+  mutate(taxon = recode(taxon,
+    MMUR = "Gray mouse lemur",
+    CMED = "Fat-tailed dwarf lemur",
+    DMAD = "Aye-aye",
+    EFLA = "Blue-eyed black lemur",
+    EMON = "Mongoose lemur",
+    ECOL = "Collared brown lemur",
+    VVV = "Black-and-white ruffed lemur",
+    NPYG = "Pygmy slow loris",
+    VRUB = "Red ruffed lemur",
+    PCOQ = "Coquerel’s sifaka",
+    LCAT = "Ring-tailed lemur",
+  )) %>%
   mutate(taxon = fct_lump_n(taxon,10)) %>%
   filter(taxon != "Other" & !is.na(weight_g)) %>%
   select(taxon, sex, name, dob, estimated_dob, litter_size, age_at_death_y, n_known_offspring, weight_g)
@@ -57,6 +59,9 @@ ggplot(data = most_common_lemurs,
                       alpha = 0.6,
                       quantile_lines = TRUE,
                       quantiles = 2,
+                      jittered_points = TRUE,
+                      position = position_points_jitter(width = 0, height = 0),
+                      point_shape = '|', point_size = 1.1, point_alpha = 0.05,
                       rel_min_height = 0.001,
                       show.legend = FALSE) +
   xlim(c(-200, 6200)) +
@@ -70,6 +75,7 @@ ggplot(data = most_common_lemurs,
     y = element_blank()
   ) +
   theme(
+    plot.title.position = "plot",
     plot.background = element_rect("white"),
     plot.title = element_text(family = "raleway"),
     plot.subtitle = element_text(family = "poppins",
