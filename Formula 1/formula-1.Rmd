@@ -119,7 +119,7 @@ p <- ggplot(data = filter(win_counts, constructorId %in% top_constructors),
   labs(
     title = "Total Formula 1 first-place finishes, 1950-{closest_state}",
     subtitle = "Constructors with most wins in history",
-    caption = "@alanjern | Data: Egast API",
+    caption = "@alanjern | Data: Ergast API",
     x = NULL,
     y = NULL
   ) +
@@ -142,3 +142,5 @@ animate(p, nframes = 3 * (MAX_YEAR - MIN_YEAR), end_pause = 30,
 anim_save("top_constructors.gif")
 
 ```
+
+
