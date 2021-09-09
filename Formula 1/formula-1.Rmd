@@ -1,0 +1,144 @@
+---
+title: "Formula 1 Races"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(tidyverse)
+
+```
+
+```{r load-data}
+constructors <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/constructors.csv')
+constructor_results <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/constructor_results.csv')
+pit_stops <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/pit_stops.csv')
+races <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/races.csv')
+results <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/results.csv')
+driver_standings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/driver_standings.csv')
+drivers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/drivers.csv')
+races <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/races.csv')
+```
+```{r explore-pit-stop-data}
+
+stops_and_results <- pit_stops %>% 
+  group_by(raceId, driverId) %>%
+  add_count(name = "num_stops") %>%
+  mutate(total_stop = sum(milliseconds)) %>%
+  ungroup() %>%
+  left_join(results, by = c("raceId", "driverId"))
+
+
+ggplot(data = stops_and_results,
+       mapping = aes(x = total_stop/1000, y = positionOrder)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10(labels = scales::label_number()) +
+  labs(x = "Total pit stop time (s)",
+       y  = "Finishing position")
+#  geom_jitter(height = 0.1, width = 0.1, alpha = 0.2)
+
+```
+
+```{r explore-car-data}
+
+MIN_YEAR <- 1950
+MAX_YEAR <- 2021
+
+win_counts <- results %>%
+  left_join(select(races, raceId, year), by = "raceId") %>%
+  left_join(constructors, by = "constructorId") %>%
+  filter(positionOrder == 1) %>%
+  group_by(constructorId, name) %>%
+  count(year, name = "n_wins") %>%
+  complete(year = MIN_YEAR:MAX_YEAR, fill = list(n_wins = 0)) %>%
+  mutate(total_wins = cumsum(n_wins)) %>%
+  arrange(year, desc(n_wins)) %>%
+  ungroup()
+
+top_constructors <- win_counts %>%
+  filter(year == MAX_YEAR) %>%
+  slice_max(order_by = total_wins, n = 15) %>%
+  pull(constructorId)
+
+top_win_counts <- win_counts %>%
+  filter(constructorId %in% top_constructors) %>%
+  group_by(year) %>%
+  mutate(rank = dense_rank(-total_wins)) %>%
+  ungroup()
+
+```
+
+
+
+
+```{r car-wins-static-plot}
+library(showtext)
+
+font_add_google("Merriweather", "merri")
+font_add_google("Roboto", "roboto")
+showtext_auto()
+
+ggplot(data = filter(win_counts, year == 2021, constructorId %in% top_constructors),
+       mapping = aes(x = total_wins, y = fct_reorder(name, total_wins),
+                     fill = name)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Ferrari has dominated Formula 1 for years",
+    subtitle = "But Red Bull is an up-and-comer",
+    x = "Total first-place finishes",
+    y = "Constructor"
+  ) +
+  scale_fill_viridis_d(option = "magma") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(family = "merri"),
+    plot.subtitle = element_text(family = "roboto"),
+    axis.title = element_text(family = "roboto"),
+    plot.title.position = "plot"
+  )
+```
+
+
+
+```{r car-wins-animated-plot}
+library(gganimate)
+
+font_add_google("Merriweather", "merri")
+font_add_google("Roboto", "roboto")
+showtext_auto()
+
+
+p <- ggplot(data = filter(win_counts, constructorId %in% top_constructors),
+       mapping = aes(x = total_wins, 
+                     y = fct_rev(name),
+                     fill = name)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Total Formula 1 first-place finishes, 1950-{closest_state}",
+    subtitle = "Constructors with most wins in history",
+    caption = "@alanjern | Data: Egast API",
+    x = NULL,
+    y = NULL
+  ) +
+  scale_fill_viridis_d(option = "magma") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(family = "merri"),
+    plot.subtitle = element_text(family = "roboto"),
+    axis.title = element_text(family = "roboto"),
+    plot.caption = element_text(family = "roboto"),
+    plot.title.position = "plot",
+    plot.margin = margin(10,15,10,25)
+  ) +
+  transition_states(year, transition_length = 3, state_length = 1) +
+  enter_fade() +
+  exit_fade()
+
+animate(p, nframes = 3 * (MAX_YEAR - MIN_YEAR), end_pause = 30,
+        height = 700, width = 600)
+anim_save("top_constructors.gif")
+
+```
