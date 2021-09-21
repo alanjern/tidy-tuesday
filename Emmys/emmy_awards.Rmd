@@ -1,0 +1,64 @@
+---
+title: "Emmys"
+author: "Alan Jern"
+date: "9/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load packages
+
+```{r packages}
+library(tidyverse)
+library(janitor)
+```
+
+## Load data
+
+```{r load-data}
+nominees <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-21/nominees.csv')
+imdb_tv_ratings <- readr::read_csv('https://raw.githubusercontent.com/WittmannF/imdb-tv-ratings/master/all-series-ep-average.csv') %>% clean_names
+```
+
+```{r explore-data}
+
+library(ggtext)
+
+MIN_YEAR <- 2003
+MAX_YEAR <- 2008
+
+shows <- c("The Wire", "CSI: Crime Scene Investigation")
+
+nominees %>%
+  group_by(title, year) %>%
+  count(type) %>%
+  ungroup() %>%
+  filter(title %in% shows,
+         year >= MIN_YEAR,
+         year <= MAX_YEAR) %>%
+  complete(year = MIN_YEAR:MAX_YEAR,
+           type, title,
+           fill = list(n = 0)) %>%
+  mutate(title = recode(title, "CSI: Crime Scene Investigation" = "CSI")) %>%
+  ggplot(aes(x = year, y = n, fill = type)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(vars(fct_rev(title))) +
+  ggthemes::theme_solarized() +
+  scale_fill_manual(values = c("#3DA5D9", "#113255")) +
+  labs(
+    title = "Emmy <span style='color:#3DA5D9'>nominations</span> and <span style='color:#113255'>wins</span> during *The Wire*'s eligibility period",
+    caption = "@alanjern | Data: emmys.com",
+    x = NULL,
+    y = NULL
+  ) +
+  theme(
+    plot.title = element_markdown()
+  )
+
+ggsave("thewire_emmys.png", width = 6, height = 4)
+
+```
+
